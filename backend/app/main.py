@@ -5,7 +5,8 @@ from app.api.routes import (
     research,
     message,
     workflow,
-    scoring
+    scoring,
+    analytics
 )
 
 app = FastAPI(
@@ -22,3 +23,4 @@ app.include_router(research.router, prefix="/ai")
 app.include_router(message.router, prefix="/ai")
 app.include_router(workflow.router, prefix="/automation")
 app.include_router(scoring.router, prefix="/analytics")
+app.include_router(analytics.router, prefix="/dashboard")

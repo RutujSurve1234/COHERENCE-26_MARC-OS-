@@ -1,4 +1,5 @@
 from app.core.throttler import throttler
+from app.core.analytics import analytics
 
 
 def send_email(lead_email, message):
@@ -7,6 +8,8 @@ def send_email(lead_email, message):
 
     if not allowed:
 
+        analytics.track_event("emails_blocked")
+
         return {
             "status": "blocked",
             "reason": reason
@@ -14,7 +17,8 @@ def send_email(lead_email, message):
 
     throttler.record_message(lead_email)
 
-    # simulated email send
+    analytics.track_event("emails_sent")
+
     print("Sending email to:", lead_email)
     print(message)
 

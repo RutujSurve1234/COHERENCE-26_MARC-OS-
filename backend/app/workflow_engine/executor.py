@@ -4,9 +4,13 @@ import time
 from app.agents.lead_research_agent import research_lead
 from app.agents.message_writer_agent import generate_outreach_message
 from app.services.email_service import send_email
+from app.core.analytics import analytics
 
 
 def execute_workflow(lead, workflow):
+
+    # Track workflow execution
+    analytics.track_event("workflow_executions")
 
     context = {
         "lead": lead,
@@ -42,17 +46,19 @@ def execute_workflow(lead, workflow):
 
             print(f"Waiting {delay_hours} hours")
 
-            # hackathon simulation (seconds instead of hours)
+            # Hackathon simulation (seconds instead of hours)
             time.sleep(delay_hours)
 
         elif step_type == "send_email":
 
-         if "email" not in lead:
-            return {"error": "Lead email missing"}
+            if "email" not in lead:
+                return {"error": "Lead email missing"}
 
-    result = send_email(
-        lead["email"],
-        context["message"]
-    )
+            result = send_email(
+                lead["email"],
+                context["message"]
+            )
+
+            context["email_status"] = result
 
     return context
