@@ -3,18 +3,21 @@ import StatCard from "../components/StatCard";
 import ChartCard from "../components/ChartCard";
 import "./Dashboard.css";
 import { FaUsers, FaPaperPlane, FaReply, FaChartLine } from "react-icons/fa";
-import { Bar, Line } from "react-chartjs-2";
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend, Filler } from "chart.js";
+import { Bar, Line, Doughnut } from "react-chartjs-2";
+import { 
+  Chart as ChartJS, CategoryScale, LinearScale, BarElement, 
+  PointElement, LineElement, ArcElement, Tooltip, Legend, Filler 
+} from "chart.js";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend, Filler);
+ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler);
 
 function Dashboard() {
-  // Premium Dark Theme Chart Config
+  // --- Premium Dark Theme Chart Config ---
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { display: false }, // Hiding legend for a cleaner look
+      legend: { display: false },
       tooltip: {
         backgroundColor: 'rgba(15, 23, 42, 0.95)',
         titleColor: '#f8fafc',
@@ -68,6 +71,16 @@ function Dashboard() {
     }]
   };
 
+  const scoreData = {
+    labels: ["High (70-100)", "Medium (40-70)", "Low (0-40)"],
+    datasets: [{
+      data: [320, 610, 320],
+      backgroundColor: ["rgba(16, 185, 129, 0.9)", "rgba(99, 102, 241, 0.9)", "rgba(225, 29, 72, 0.9)"],
+      borderWidth: 0,
+      hoverOffset: 4
+    }]
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6 lg:space-y-8 pb-10">
       
@@ -95,7 +108,7 @@ function Dashboard() {
         <StatCard title="Conversion Rate" value="8.4%" icon={<FaChartLine />} className="animate-fade-in delay-300" />
       </div>
 
-      {/* Charts Grid */}
+      {/* Top Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
         <ChartCard title="Outreach Activity Volume" className="animate-fade-in delay-200">
           <div className="h-[300px] w-full mt-4">
@@ -108,6 +121,69 @@ function Dashboard() {
           </div>
         </ChartCard>
       </div>
+
+      {/* Bottom Features Grid (Using ChartCard for UI Consistency) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+        
+        <ChartCard title="Lead Score Distribution" className="animate-fade-in delay-400">
+          <div className="h-[300px] w-full mt-4 flex flex-col justify-between">
+            <div className="relative flex-1 min-h-0">
+              <Doughnut 
+                data={scoreData} 
+                options={{
+                  responsive: true, 
+                  maintainAspectRatio: false, 
+                  cutout: '75%',
+                  plugins: { legend: { display: false } }
+                }} 
+              />
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-3xl font-black text-white">1,240</span>
+                <span className="text-xs text-slate-500 uppercase tracking-widest font-bold">Total</span>
+              </div>
+            </div>
+            {/* Custom Legend */}
+            <div className="w-full mt-6 space-y-3 px-2 shrink-0 pb-2">
+              <div className="flex justify-between items-center text-sm"><span className="flex items-center gap-3"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div> High (70-100)</span> <span className="text-slate-300 font-bold">320 leads</span></div>
+              <div className="flex justify-between items-center text-sm"><span className="flex items-center gap-3"><div className="w-2.5 h-2.5 rounded-full bg-indigo-500"></div> Medium (40-70)</span> <span className="text-slate-300 font-bold">610 leads</span></div>
+              <div className="flex justify-between items-center text-sm"><span className="flex items-center gap-3"><div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div> Low (0-40)</span> <span className="text-slate-300 font-bold">310 leads</span></div>
+            </div>
+          </div>
+        </ChartCard>
+
+        <ChartCard title="System Activity Feed" className="animate-fade-in delay-500">
+          <div className="h-[300px] w-full mt-4 overflow-y-auto pr-4 space-y-6 custom-scrollbar text-left">
+            
+            <div className="flex gap-4">
+              <div className="mt-1.5 w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)] shrink-0"></div>
+              <div><p className="text-sm text-slate-300"><span className="font-bold text-white">Lead John Smith</span> added to system.</p><p className="text-xs text-slate-500 mt-0.5">2 mins ago</p></div>
+            </div>
+            
+            <div className="flex gap-4">
+              <div className="mt-1.5 w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.8)] shrink-0"></div>
+              <div><p className="text-sm text-slate-300">Email sent to <span className="font-bold text-white">Acme Corp</span>.</p><p className="text-xs text-slate-500 mt-0.5">14 mins ago</p></div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="mt-1.5 w-2.5 h-2.5 rounded-full bg-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.8)] shrink-0"></div>
+              <div><p className="text-sm text-slate-300"><span className="font-bold text-white">Lead Sarah</span> replied to outreach.</p><p className="text-xs text-slate-500 mt-0.5">1 hour ago</p></div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="mt-1.5 w-2.5 h-2.5 rounded-full bg-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.8)] shrink-0"></div>
+              <div><p className="text-sm text-slate-300">Workflow <span className="font-bold text-white">SaaS Outreach</span> executed step 3.</p><p className="text-xs text-slate-500 mt-0.5">2 hours ago</p></div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="mt-1.5 w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)] shrink-0"></div>
+              <div><p className="text-sm text-slate-300"><span className="font-bold text-emerald-400">Lead converted</span> to customer!</p><p className="text-xs text-slate-500 mt-0.5">Yesterday</p></div>
+            </div>
+
+          </div>
+        </ChartCard>
+
+      </div>
+
     </div>
   );
 }
