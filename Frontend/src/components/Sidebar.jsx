@@ -7,7 +7,7 @@ const menuItems = [
   { name: "Workflows", icon: <FaProjectDiagram />, path: "/workflows" },
   { name: "Campaigns", icon: <FaPaperPlane />, path: "/campaigns" },
   { name: "Analytics", icon: <FaChartLine />, path: "/analytics" },
-  { name: "Settings", icon: <FaCog />, path: "/settings" },
+  
 ];
 
 function Sidebar() {

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom'; // 1. Import useNavigate
 import StatCard from "../components/StatCard";
 import ChartCard from "../components/ChartCard";
 import "./Dashboard.css";
@@ -12,6 +13,8 @@ import {
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Tooltip, Legend, Filler);
 
 function Dashboard() {
+  const navigate = useNavigate(); // 2. Initialize the hook
+
   // --- Premium Dark Theme Chart Config ---
   const chartOptions = {
     responsive: true,
@@ -91,12 +94,23 @@ function Dashboard() {
           <p className="text-slate-400 text-sm lg:text-base max-w-xl">Configure intelligent workflows, upload your target leads, and monitor generative AI campaign performance in real-time.</p>
         </div>
         <div className="flex gap-4 z-10 w-full md:w-auto">
-          <button className="flex-1 md:flex-none bg-slate-800/80 hover:bg-slate-700 text-white border border-slate-600/50 px-6 py-3 rounded-xl font-medium transition-all duration-300 shadow-lg">
+          
+          {/* 3. Add onClick to route to leads page */}
+          <button 
+            onClick={() => navigate('/leads')}
+            className="flex-1 md:flex-none bg-slate-800/80 hover:bg-slate-700 text-white border border-slate-600/50 px-6 py-3 rounded-xl font-medium transition-all duration-300 shadow-lg"
+          >
             Upload Leads
           </button>
-          <button className="flex-1 md:flex-none bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white px-6 py-3 rounded-xl font-medium transition-all duration-300 shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_25px_rgba(79,70,229,0.5)]">
+          
+          {/* 4. Add onClick to route to workflow builder */}
+          <button 
+            onClick={() => navigate('/workflows/builder')}
+            className="flex-1 md:flex-none bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white px-6 py-3 rounded-xl font-medium transition-all duration-300 shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_25px_rgba(79,70,229,0.5)]"
+          >
             Create Workflow
           </button>
+          
         </div>
       </div>
 
@@ -122,7 +136,7 @@ function Dashboard() {
         </ChartCard>
       </div>
 
-      {/* Bottom Features Grid (Using ChartCard for UI Consistency) */}
+      {/* Bottom Features Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
         
         <ChartCard title="Lead Score Distribution" className="animate-fade-in delay-400">

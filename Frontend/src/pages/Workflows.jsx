@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  FaPlus, FaPlay, FaPause, FaCopy, FaTrash, 
+  FaPlus, FaPlay, FaPause, FaCopy, FaTrash, FaEdit, FaTimes,
   FaProjectDiagram, FaUsers, FaCheckCircle, FaShieldAlt
 } from "react-icons/fa";
 import { useNavigate } from 'react-router-dom';
@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 function Workflows() {
   const navigate = useNavigate();
   
-  // Changed to include setWorkflows so we can update the state
+  // --- STATE ---
   const [workflows, setWorkflows] = useState([
     {
       id: 1,
@@ -42,13 +42,13 @@ function Workflows() {
     }
   ]);
 
+  const [editingWf, setEditingWf] = useState(null); // Tracks which workflow is being edited
+
   // --- INTERACTIVE FUNCTIONS ---
 
-  // 1. Toggle Workflow Status (Active <-> Paused)
   const handleToggleStatus = (id) => {
     setWorkflows(workflows.map(wf => {
       if (wf.id === id) {
-        // Prevent starting a Draft that has no leads (simulated logic)
         if (wf.status === 'Draft') return { ...wf, status: 'Active', lastEdited: 'Just now' };
         return { 
           ...wf, 
@@ -60,32 +60,36 @@ function Workflows() {
     }));
   };
 
-  // 2. Duplicate a Workflow
   const handleDuplicate = (id) => {
     const wfToCopy = workflows.find(wf => wf.id === id);
     if (wfToCopy) {
       const duplicatedWf = {
         ...wfToCopy,
-        id: Date.now(), // Generate unique ID
+        id: Date.now(),
         name: `${wfToCopy.name} (Copy)`,
-        status: 'Draft', // Copies always start as Draft
+        status: 'Draft',
         enrolled: 0,
         actionsExecuted: 0,
         conversion: "0.0%",
         lastEdited: "Just now"
       };
-      // Add the new workflow to the beginning of the list
       setWorkflows([duplicatedWf, ...workflows]);
     }
   };
 
-  // 3. Delete a Workflow
   const handleDelete = (id) => {
     setWorkflows(workflows.filter(wf => wf.id !== id));
   };
 
+  // Save the edited workflow data
+  const handleSaveEdit = (e) => {
+    e.preventDefault();
+    setWorkflows(workflows.map(wf => wf.id === editingWf.id ? { ...editingWf, lastEdited: 'Just now' } : wf));
+    setEditingWf(null);
+  };
+
   return (
-    <div className="max-w-[1400px] mx-auto space-y-8 animate-fade-in pb-12">
+    <div className="max-w-[1400px] mx-auto space-y-8 animate-fade-in pb-12 relative">
       
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900/60 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
@@ -116,7 +120,7 @@ function Workflows() {
           {workflows.map(wf => (
             <div key={wf.id} className="bg-slate-900 border border-slate-800/80 rounded-2xl p-6 shadow-xl hover:border-slate-700 transition-all group relative overflow-hidden flex flex-col h-full">
               
-              {/* Header */}
+              {/* Header with Edit & Delete */}
               <div className="flex justify-between items-start mb-4">
                 <div className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border transition-colors ${
                   wf.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 
@@ -126,14 +130,22 @@ function Workflows() {
                   {wf.status}
                 </div>
                 
-                {/* Delete Button replaced the Ellipsis */}
-                <button 
-                  onClick={() => handleDelete(wf.id)}
-                  title="Delete Workflow"
-                  className="text-slate-600 hover:text-rose-400 p-1.5 rounded-lg hover:bg-rose-500/10 transition-colors"
-                >
-                  <FaTrash size={14} />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button 
+                    onClick={() => setEditingWf(wf)}
+                    title="Edit Settings"
+                    className="text-slate-500 hover:text-indigo-400 p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+                  >
+                    <FaEdit size={14} />
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(wf.id)}
+                    title="Delete Workflow"
+                    className="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-rose-500/10 transition-colors"
+                  >
+                    <FaTrash size={14} />
+                  </button>
+                </div>
               </div>
 
               <h3 className="text-lg font-bold text-slate-100 mb-1 group-hover:text-indigo-400 transition-colors line-clamp-1">{wf.name}</h3>
@@ -177,18 +189,80 @@ function Workflows() {
 
                   <div className="w-px h-6 bg-slate-800 my-auto mx-1"></div>
 
+                  {/* "Edit Flow" still takes you to the visual builder canvas */}
                   <button 
                     onClick={() => navigate('/workflows/builder')}
                     className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition-colors border border-slate-700"
                   >
                     Edit Flow
-                  </button>   
+                  </button>
                 </div>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      {/* ==========================================
+          EDIT MODAL
+      ========================================== */}
+      {editingWf && (
+        <div className="fixed inset-0 bg-[#020617]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden">
+            
+            <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950/50">
+              <h2 className="text-lg font-bold text-white flex items-center gap-2"><FaProjectDiagram className="text-indigo-400"/> Edit Workflow Settings</h2>
+              <button onClick={() => setEditingWf(null)} className="text-slate-500 hover:text-white transition-colors p-1"><FaTimes /></button>
+            </div>
+            
+            <form onSubmit={handleSaveEdit} className="p-6 space-y-5">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Workflow Name</label>
+                <input 
+                  required 
+                  type="text" 
+                  value={editingWf.name} 
+                  onChange={e => setEditingWf({...editingWf, name: e.target.value})} 
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors" 
+                />
+              </div>
+              
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                  <FaShieldAlt /> Safety Throttling Level
+                </label>
+                <select 
+                  value={editingWf.safety} 
+                  onChange={e => setEditingWf({...editingWf, safety: e.target.value})} 
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors"
+                >
+                  <option value="Strict">Strict (Max 100 emails/day, high variance)</option>
+                  <option value="Moderate">Moderate (Max 300 emails/day, standard variance)</option>
+                  <option value="Relaxed">Relaxed (Max 1000 emails/day, low variance)</option>
+                </select>
+                <p className="text-[10px] text-slate-500 mt-2">Adjusts the automated delays between node executions to protect sender reputation.</p>
+              </div>
+
+              <div className="pt-4 flex justify-end gap-3 border-t border-slate-800/60 mt-6">
+                <button 
+                  type="button" 
+                  onClick={() => setEditingWf(null)} 
+                  className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-bold shadow-[0_0_15px_rgba(79,70,229,0.3)] transition-all"
+                >
+                  Save Settings
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
