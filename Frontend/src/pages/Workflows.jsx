@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FaPlus, FaPlay, FaPause, FaCopy, FaTrash, FaEdit, FaTimes,
   FaProjectDiagram, FaUsers, FaCheckCircle, FaShieldAlt
@@ -8,53 +8,68 @@ import { useNavigate } from 'react-router-dom';
 function Workflows() {
   const navigate = useNavigate();
   
-  // --- STATE ---
-  const [workflows, setWorkflows] = useState([
-    {
-      id: 1,
-      name: "Enterprise Tech - C-Level Outreach",
-      status: "Active",
-      enrolled: 1240,
-      actionsExecuted: 5420,
-      conversion: "8.4%",
-      safety: "Strict",
-      lastEdited: "2 hours ago"
-    },
-    {
-      id: 2,
-      name: "SaaS Founders Follow-up Sequence",
-      status: "Paused",
-      enrolled: 450,
-      actionsExecuted: 1200,
-      conversion: "4.1%",
-      safety: "Moderate",
-      lastEdited: "1 day ago"
-    },
-    {
-      id: 3,
-      name: "Inbound Lead Qualification (AI Scoring)",
-      status: "Draft",
-      enrolled: 0,
-      actionsExecuted: 0,
-      conversion: "0.0%",
-      safety: "Strict",
-      lastEdited: "Just now"
-    }
-  ]);
+  // --- STATE (READ FROM LOCAL STORAGE) ---
+  const [workflows, setWorkflows] = useState(() => {
+    const savedWorkflows = localStorage.getItem('saved_workflows');
+    return savedWorkflows ? JSON.parse(savedWorkflows) : [];
+  });
 
-  const [editingWf, setEditingWf] = useState(null); // Tracks which workflow is being edited
+  const [editingWf, setEditingWf] = useState(null); 
+
+  // --- PERSIST CHANGES ---
+  useEffect(() => {
+    localStorage.setItem('saved_workflows', JSON.stringify(workflows));
+  }, [workflows]);
+
+  // --- SMART SIMULATOR (Capped at realistic limits) ---
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setWorkflows(prevWorkflows => prevWorkflows.map(wf => {
+        // Only run metrics if the workflow is Active AND has enrolled leads
+        if (wf.status === 'Active' && wf.enrolled > 0) {
+          
+          // Calculate a realistic cap (e.g., ~4 actions per enrolled lead)
+          const maxActions = wf.enrolled * 4; 
+          const currentActions = wf.actionsExecuted || 0;
+          
+          if (currentActions < maxActions) {
+            // Add 1 to 3 actions randomly every tick to simulate real processing
+            const newActions = currentActions + Math.floor(Math.random() * 3) + 1;
+            
+            // Slowly increase conversion, capping around 12-15%
+            const currentConversion = parseFloat(wf.conversion || "0.0") || 0;
+            const newConversion = currentConversion < 14.5 ? (currentConversion + 0.05).toFixed(2) : currentConversion.toFixed(2);
+            
+            return { 
+              ...wf, 
+              actionsExecuted: Math.min(newActions, maxActions), // Ensure it doesn't exceed the cap
+              conversion: `${newConversion}%` 
+            };
+          }
+        }
+        return wf;
+      }));
+    }, 3500); // Ticks every 3.5 seconds
+    
+    return () => clearInterval(interval);
+  }, []);
+
 
   // --- INTERACTIVE FUNCTIONS ---
 
   const handleToggleStatus = (id) => {
+    // Pull the real leads from localStorage to determine enrollment
+    const savedLeads = JSON.parse(localStorage.getItem('uploaded_leads') || '[]');
+    const totalLeadsCount = savedLeads.length;
+
     setWorkflows(workflows.map(wf => {
       if (wf.id === id) {
-        if (wf.status === 'Draft') return { ...wf, status: 'Active', lastEdited: 'Just now' };
-        return { 
-          ...wf, 
-          status: wf.status === 'Active' ? 'Paused' : 'Active',
-          lastEdited: 'Just now'
-        };
+        if (wf.status === 'Draft' || wf.status === 'Paused') {
+          // Update the enrolled number instantly based on the Leads page CSV
+          return { ...wf, status: 'Active', enrolled: totalLeadsCount, lastEdited: 'Just now' };
+        } else {
+          return { ...wf, status: 'Paused', lastEdited: 'Just now' };
+        }
       }
       return wf;
     }));
@@ -81,11 +96,33 @@ function Workflows() {
     setWorkflows(workflows.filter(wf => wf.id !== id));
   };
 
-  // Save the edited workflow data
   const handleSaveEdit = (e) => {
     e.preventDefault();
     setWorkflows(workflows.map(wf => wf.id === editingWf.id ? { ...editingWf, lastEdited: 'Just now' } : wf));
     setEditingWf(null);
+  };
+
+  // --- CREATION FUNCTION ---
+  const handleCreateNew = () => {
+    const newWorkflow = {
+      id: Date.now(),
+      name: "New Automated Sequence",
+      status: "Draft",
+      enrolled: 0,
+      actionsExecuted: 0,
+      conversion: "0.0%",
+      safety: "Strict",
+      lastEdited: "Just now"
+    };
+    
+    const updatedWorkflows = [newWorkflow, ...workflows];
+    setWorkflows(updatedWorkflows);
+    
+    // Save to memory instantly so the draft is present when returning from builder
+    localStorage.setItem('saved_workflows', JSON.stringify(updatedWorkflows));
+    
+    // Jump straight to the canvas
+    navigate('/workflows/builder'); 
   };
 
   return (
@@ -101,7 +138,7 @@ function Workflows() {
           <p className="text-slate-400 text-sm mt-2">Manage, simulate, and track your AI-driven outreach automation.</p>
         </div>
         <button 
-          onClick={() => navigate('/workflows/builder')}
+          onClick={handleCreateNew}
           className="z-10 flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold transition-all shadow-[0_0_20px_rgba(79,70,229,0.4)] hover:shadow-[0_0_30px_rgba(79,70,229,0.6)]"
         >
           <FaPlus /> Create New Workflow
@@ -118,7 +155,7 @@ function Workflows() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {workflows.map(wf => (
-            <div key={wf.id} className="bg-slate-900 border border-slate-800/80 rounded-2xl p-6 shadow-xl hover:border-slate-700 transition-all group relative overflow-hidden flex flex-col h-full">
+            <div key={wf.id} className={`bg-slate-900 border rounded-2xl p-6 shadow-xl transition-all flex flex-col h-full ${wf.status === 'Active' ? 'border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.1)]' : 'border-slate-800/80 hover:border-slate-700'}`}>
               
               {/* Header with Edit & Delete */}
               <div className="flex justify-between items-start mb-4">
@@ -152,19 +189,23 @@ function Workflows() {
               <p className="text-xs text-slate-500 mb-6 flex items-center gap-1.5"><FaShieldAlt /> Safety Throttling: {wf.safety}</p>
 
               {/* Metrics */}
-              <div className="grid grid-cols-2 gap-4 mb-6 flex-1">
+              <div className="grid grid-cols-3 gap-3 mb-6 mt-4">
                 <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800/50">
-                  <p className="text-[10px] text-slate-500 uppercase font-semibold mb-1 flex items-center gap-1.5"><FaUsers /> Enrolled</p>
-                  <p className="text-xl font-black text-slate-200">{wf.enrolled.toLocaleString()}</p>
+                  <p className="text-[9px] text-slate-500 uppercase font-semibold mb-1 flex items-center gap-1.5">Enrolled</p>
+                  <p className="text-lg font-black text-slate-200">{wf.enrolled || 0}</p>
                 </div>
                 <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800/50">
-                  <p className="text-[10px] text-slate-500 uppercase font-semibold mb-1 flex items-center gap-1.5"><FaCheckCircle /> Converted</p>
-                  <p className="text-xl font-black text-emerald-400">{wf.conversion}</p>
+                  <p className="text-[9px] text-slate-500 uppercase font-semibold mb-1 flex items-center gap-1.5">Actions</p>
+                  <p className="text-lg font-black text-indigo-400">{wf.actionsExecuted || 0}</p>
+                </div>
+                <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800/50">
+                  <p className="text-[9px] text-slate-500 uppercase font-semibold mb-1 flex items-center gap-1.5">Converted</p>
+                  <p className="text-lg font-black text-emerald-400">{wf.conversion || '0.0%'}</p>
                 </div>
               </div>
 
               {/* Actions Footer */}
-              <div className="flex items-center justify-between pt-4 border-t border-slate-800/60">
+              <div className="flex items-center justify-between pt-4 border-t border-slate-800/60 mt-auto">
                 <span className="text-xs text-slate-500">Edited {wf.lastEdited}</span>
                 <div className="flex gap-2">
                   <button 
@@ -189,7 +230,6 @@ function Workflows() {
 
                   <div className="w-px h-6 bg-slate-800 my-auto mx-1"></div>
 
-                  {/* "Edit Flow" still takes you to the visual builder canvas */}
                   <button 
                     onClick={() => navigate('/workflows/builder')}
                     className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition-colors border border-slate-700"
@@ -212,7 +252,7 @@ function Workflows() {
             
             <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950/50">
               <h2 className="text-lg font-bold text-white flex items-center gap-2"><FaProjectDiagram className="text-indigo-400"/> Edit Workflow Settings</h2>
-              <button onClick={() => setEditingWf(null)} className="text-slate-500 hover:text-white transition-colors p-1"><FaTimes /></button>
+              <button onClick={() => setEditingWf(null)} className="text-slate-400 hover:text-white transition-colors p-1"><FaTimes /></button>
             </div>
             
             <form onSubmit={handleSaveEdit} className="p-6 space-y-5">

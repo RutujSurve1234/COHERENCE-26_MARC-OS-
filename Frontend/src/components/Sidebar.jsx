@@ -8,6 +8,7 @@ const menuItems = [
   { name: "Campaigns", icon: <FaPaperPlane />, path: "/campaigns" },
   { name: "Analytics", icon: <FaChartLine />, path: "/analytics" },
   
+  
 ];
 
 function Sidebar() {

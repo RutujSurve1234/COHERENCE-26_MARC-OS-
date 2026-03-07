@@ -1,73 +1,107 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react'; // <-- Added useEffect here
 import { 
   FaSearch, FaFilter, FaCloudUploadAlt, FaTrash, FaEdit,
-  FaUserPlus, FaFire, FaBullseye, FaTags, FaTimes, FaFileCsv, FaSpinner
+  FaUserPlus, FaFire, FaBullseye, FaTags, FaTimes, FaFileCsv, FaSpinner, FaCheck
 } from "react-icons/fa";
 import StatCard from '../components/StatCard';
-import LeadProfile from './LeadProfile'; // Make sure this is in the same folder
+import LeadProfile from './LeadProfile'; 
 
 export default function Leads() {
   // --- STATE MANAGEMENT ---
-  const [selectedLead, setSelectedLead] = useState(null); // For the Slide-out Drawer
-  const [editingLead, setEditingLead] = useState(null); // For the Edit Modal
+  const [selectedLead, setSelectedLead] = useState(null); 
+  const [editingLead, setEditingLead] = useState(null); 
   const [showImportModal, setShowImportModal] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+
+  // File Upload State
+  const [selectedFile, setSelectedFile] = useState(null);
+  const fileInputRef = useRef(null);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   
-  const [leads, setLeads] = useState([
-    { 
-      id: 1, name: "Alice Freeman", company: "TechCorp Industries", email: "alice@techcorp.com",
-      status: "Qualified", aiScore: 98, tags: ["Enterprise", "High Intent"],
-      lastActivity: "Opened Email: 'Scaling Infrastructure'", timestamp: "10 mins ago", avatarColor: "from-emerald-400 to-teal-500"
-    },
-    { 
-      id: 2, name: "Marcus Johnson", company: "Global Nexus AI", email: "mjohnson@globalnexus.io",
-      status: "Contacted", aiScore: 85, tags: ["SaaS", "Follow-up"],
-      lastActivity: "Automated Workflow Step 2 Triggered", timestamp: "2 hours ago", avatarColor: "from-indigo-400 to-blue-500"
-    },
-    { 
-      id: 3, name: "Sarah Davis", company: "Innovate Financial", email: "sdavis@innovate.finance",
-      status: "New", aiScore: 92, tags: ["FinTech", "Inbound"],
-      lastActivity: "Lead Scored via AI Engine", timestamp: "Just now", avatarColor: "from-amber-400 to-orange-500"
-    }
-  ]);
+  // --- NEW: READ FROM LOCAL STORAGE ON LOAD ---
+  const [leads, setLeads] = useState(() => {
+    const savedLeads = localStorage.getItem('uploaded_leads');
+    return savedLeads ? JSON.parse(savedLeads) : [];
+  });
+
+  // --- NEW: SAVE TO LOCAL STORAGE ON CHANGE ---
+  useEffect(() => {
+    localStorage.setItem('uploaded_leads', JSON.stringify(leads));
+  }, [leads]);
 
   // --- CRUD ACTIONS ---
-
   const handleDelete = (id, e) => {
-    e.stopPropagation(); // Prevents opening the drawer when clicking delete
+    e.stopPropagation();
     setLeads(leads.filter(lead => lead.id !== id));
   };
 
   const handleSaveEdit = (e) => {
     e.preventDefault();
-    // Update the specific lead in the array
     setLeads(leads.map(l => l.id === editingLead.id ? editingLead : l));
-    setEditingLead(null); // Close modal
+    setEditingLead(null); 
   };
 
-  const handleSimulateImport = () => {
+  // --- API INTEGRATION: REAL FILE UPLOAD ---
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
+  const handleActualImport = async () => {
+    if (!selectedFile) return;
+    
     setIsImporting(true);
-    setTimeout(() => {
-      const newLead = {
-        id: Date.now(),
-        name: "David Chen",
-        company: "Apex Logistics",
-        email: "d.chen@apexlogistics.com",
-        status: "New",
-        aiScore: 88,
-        tags: ["Supply Chain", "Imported"],
-        lastActivity: "Added via CSV Import",
-        timestamp: "Just now",
-        avatarColor: "from-purple-400 to-pink-500"
-      };
-      setLeads([newLead, ...leads]);
-      setIsImporting(false);
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+
+    try {
+      const response = await fetch("http://localhost:8000/leads/upload-leads", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Failed to upload file");
+      }
+
+      const data = await response.json();
+      
+      const newLeads = data.leads.map((lead, index) => {
+        const colors = ["from-emerald-400 to-teal-500", "from-indigo-400 to-blue-500", "from-purple-400 to-pink-500", "from-amber-400 to-orange-500"];
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+
+        return {
+          id: Date.now() + index, 
+          name: lead.Name || lead.name || lead.Full_Name || "Unknown Lead", 
+          company: lead.Company || lead.company || lead.Organization || "Unknown Company",
+          email: lead.Email || lead.email || "no-email@example.com",
+          status: "New",
+          aiScore: Math.floor(Math.random() * (99 - 70 + 1) + 70),
+          tags: ["Imported"],
+          lastActivity: "Added via File Import",
+          timestamp: "Just now",
+          avatarColor: randomColor
+        };
+      });
+
+      // Overwrite the table with the new CSV leads
+      setLeads(newLeads);
+      
+      // Reset Modal
       setShowImportModal(false);
-    }, 1500); // 1.5 second loading simulation
+      setSelectedFile(null);
+
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      alert(error.message || "Error uploading file.");
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   // --- SEARCH & FILTER LOGIC ---
@@ -163,9 +197,19 @@ export default function Leads() {
         {/* 3. WORKING LEAD TABLE */}
         <div className="w-full overflow-x-auto min-h-[300px]">
           {filteredLeads.length === 0 ? (
-            <div className="p-12 text-center text-slate-500 flex flex-col items-center">
-              <FaSearch className="text-4xl mb-3 text-slate-700" />
-              <p>No leads found matching your criteria.</p>
+            <div className="p-16 text-center text-slate-500 flex flex-col items-center">
+              {leads.length === 0 ? (
+                <>
+                  <FaCloudUploadAlt className="text-5xl mb-4 text-slate-700" />
+                  <p className="text-lg font-bold text-slate-300 mb-1">No Leads Found</p>
+                  <p className="text-sm">Click "Import / Sync Leads" above to upload your CSV file.</p>
+                </>
+              ) : (
+                <>
+                  <FaSearch className="text-4xl mb-3 text-slate-700" />
+                  <p>No leads found matching your search criteria.</p>
+                </>
+              )}
             </div>
           ) : (
             <table className="w-full text-left border-collapse">
@@ -174,7 +218,7 @@ export default function Leads() {
                   <th className="px-6 py-4">Contact</th>
                   <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4">AI Score</th>
-                  <th className="px-6 py-4">Latest Activity</th>
+                  <th className="px-6 py-4">Email</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
@@ -183,7 +227,7 @@ export default function Leads() {
                   <tr 
                     key={lead.id} 
                     className="hover:bg-slate-800/60 transition-colors group cursor-pointer"
-                    onClick={() => setSelectedLead(lead)} // Open Profile Drawer
+                    onClick={() => setSelectedLead(lead)}
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -206,8 +250,7 @@ export default function Leads() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-xs text-slate-300 truncate max-w-[200px]">{lead.lastActivity}</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5 uppercase">{lead.timestamp}</p>
+                      <p className="text-xs text-slate-300 truncate max-w-[200px]">{lead.email}</p>
                     </td>
                     <td className="px-6 py-4 text-right">
                       {/* WORKING ACTIONS */}
@@ -240,12 +283,17 @@ export default function Leads() {
           MODALS & DRAWERS
       ========================================== */}
 
-      {/* 1. Lead Profile Drawer (Already built) */}
       {selectedLead && (
-        <LeadProfile lead={selectedLead} onClose={() => setSelectedLead(null)} />
+        <LeadProfile 
+          lead={selectedLead} 
+          onClose={() => setSelectedLead(null)} 
+          onUpdate={(updatedLead) => {
+            setLeads(leads.map(l => l.id === updatedLead.id ? updatedLead : l));
+            setSelectedLead(updatedLead);
+          }}
+        />
       )}
 
-      {/* 2. Edit Lead Modal */}
       {editingLead && (
         <div className="fixed inset-0 bg-[#020617]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
@@ -256,16 +304,20 @@ export default function Leads() {
             <form onSubmit={handleSaveEdit} className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Name</label>
-                <input required type="text" value={editingLead.name} onChange={e => setEditingLead({...editingLead, name: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-200 focus:border-indigo-500" />
+                <input required type="text" value={editingLead.name} onChange={e => setEditingLead({...editingLead, name: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-200 focus:border-indigo-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Email</label>
+                <input required type="email" value={editingLead.email} onChange={e => setEditingLead({...editingLead, email: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-200 focus:border-indigo-500 outline-none" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Company</label>
-                <input required type="text" value={editingLead.company} onChange={e => setEditingLead({...editingLead, company: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-200 focus:border-indigo-500" />
+                <input required type="text" value={editingLead.company} onChange={e => setEditingLead({...editingLead, company: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-200 focus:border-indigo-500 outline-none" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Status</label>
-                  <select value={editingLead.status} onChange={e => setEditingLead({...editingLead, status: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-200 focus:border-indigo-500">
+                  <select value={editingLead.status} onChange={e => setEditingLead({...editingLead, status: e.target.value})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-200 focus:border-indigo-500 outline-none">
                     <option value="New">New</option>
                     <option value="Contacted">Contacted</option>
                     <option value="Qualified">Qualified</option>
@@ -273,7 +325,7 @@ export default function Leads() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-400 uppercase mb-1">AI Score</label>
-                  <input type="number" value={editingLead.aiScore} onChange={e => setEditingLead({...editingLead, aiScore: parseInt(e.target.value)})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-200 focus:border-indigo-500" />
+                  <input type="number" value={editingLead.aiScore} onChange={e => setEditingLead({...editingLead, aiScore: parseInt(e.target.value)})} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-200 focus:border-indigo-500 outline-none" />
                 </div>
               </div>
               <div className="pt-4 flex justify-end gap-3 border-t border-slate-800">
@@ -285,28 +337,52 @@ export default function Leads() {
         </div>
       )}
 
-      {/* 3. CSV Import Modal Simulation */}
+      {/* 3. ACTUAL CSV IMPORT MODAL */}
       {showImportModal && (
         <div className="fixed inset-0 bg-[#020617]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden">
             <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950/50">
               <h2 className="text-lg font-bold text-white flex items-center gap-2"><FaCloudUploadAlt className="text-indigo-400"/> Import Leads</h2>
-              <button onClick={() => setShowImportModal(false)} className="text-slate-400 hover:text-white"><FaTimes /></button>
+              <button onClick={() => { setShowImportModal(false); setSelectedFile(null); }} className="text-slate-400 hover:text-white transition-colors p-1"><FaTimes /></button>
             </div>
+            
             <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-dashed border-slate-600">
-                <FaFileCsv className="text-3xl text-slate-400" />
+              
+              <input 
+                type="file" 
+                accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" 
+                ref={fileInputRef} 
+                onChange={handleFileChange} 
+                className="hidden" 
+              />
+              
+              <div 
+                onClick={() => fileInputRef.current.click()}
+                className={`w-full py-10 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${selectedFile ? 'border-emerald-500 bg-emerald-500/5' : 'border-slate-600 bg-slate-800/50 hover:bg-slate-800 hover:border-indigo-500'}`}
+              >
+                {selectedFile ? (
+                  <div className="flex flex-col items-center">
+                    <FaCheck className="text-4xl text-emerald-400 mb-3" />
+                    <p className="text-sm font-bold text-slate-200">{selectedFile.name}</p>
+                    <p className="text-[10px] text-slate-500 mt-1">{(selectedFile.size / 1024).toFixed(1)} KB</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center">
+                    <FaFileCsv className="text-4xl text-slate-400 mb-4" />
+                    <p className="text-sm font-bold text-slate-200 mb-1">Click to browse or drag file here</p>
+                    <p className="text-xs text-slate-500">Supports .xlsx and .csv files</p>
+                  </div>
+                )}
               </div>
-              <h3 className="text-lg font-bold text-slate-200 mb-2">Upload CSV or Excel File</h3>
-              <p className="text-sm text-slate-400 mb-6">Drag and drop your file here, or click to browse. Ensure your file includes Name, Email, and Company columns.</p>
               
               <button 
-                onClick={handleSimulateImport}
-                disabled={isImporting}
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-600/50 text-white rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg transition-all"
+                onClick={handleActualImport}
+                disabled={isImporting || !selectedFile}
+                className="w-full mt-6 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-xl font-bold flex justify-center items-center gap-2 shadow-lg transition-all"
               >
-                {isImporting ? <><FaSpinner className="animate-spin"/> Parsing Data...</> : "Simulate Data Import"}
+                {isImporting ? <><FaSpinner className="animate-spin"/> Uploading & Parsing...</> : "Upload Data"}
               </button>
+
             </div>
           </div>
         </div>

@@ -10,7 +10,7 @@ const NODE_TYPES = {
   trigger: { id: 'trigger', name: 'Entry Trigger', icon: FaBolt, color: 'amber', category: 'Triggers', defaultData: { source: 'Dynamic Segment', rule: 'Score > 75' } },
   email: { id: 'email', name: 'Send Email', icon: FaEnvelope, color: 'blue', category: 'Actions', defaultData: { channel: 'Email', template: 'Hi {name},\n\nWe love what you are building.' } },
   linkedin: { id: 'linkedin', name: 'LinkedIn Message', icon: FaLinkedin, color: 'blue', category: 'Actions', defaultData: { channel: 'LinkedIn', template: 'Hey {name},' } },
-  delay: { id: 'delay', name: 'Wait / Delay', icon: FaClock, color: 'slate', category: 'Logic', defaultData: { duration: '2', unit: 'Days', variance: '± 1 to 3 hours' } },
+  delay: { id: 'delay', name: 'Wait / Delay', icon: FaClock, color: 'slate', category: 'Logic', defaultData: { duration: '10', unit: 'Seconds', variance: 'Exact' } }, // Defaulted to Seconds for testing
   ai: { id: 'ai', name: 'AI Gen / Rewrite', icon: FaRobot, color: 'indigo', category: 'AI Engine', defaultData: { prompt: 'Make it professional and under 100 words.' } },
   condition: { id: 'condition', name: 'Condition Check', icon: FaCodeBranch, color: 'purple', category: 'Logic', defaultData: { rule: 'If lead replied' } },
 };
@@ -39,9 +39,78 @@ export default function WorkflowBuilder() {
     }, 800);
   };
 
-  const handleToggleStatus = () => {
-    setWorkflowStatus(prev => prev === 'Active' ? 'Paused' : 'Active');
+  // --- AUTOMATION INTEGRATION (UPDATED FOR CONDITION BRANCHES & LEAD STATUS) ---
+  const handleToggleStatus = async () => {
+    if (workflowStatus === 'Active') {
+      setWorkflowStatus('Paused');
+      setLastSaved('Just now');
+      return;
+    }
+
+    const savedLeads = localStorage.getItem('uploaded_leads');
+    const parsedLeads = savedLeads ? JSON.parse(savedLeads) : [];
+
+    if (parsedLeads.length === 0) {
+      alert("⚠️ No leads found! Please go to the Leads page and upload a CSV first.");
+      return;
+    }
+
+    const targetLeads = parsedLeads.map(lead => ({
+      name: lead.name || "Unknown",
+      company: lead.company || "Unknown Company",
+      role: "Executive",
+      email: lead.email || ""
+    }));
+
+    setWorkflowStatus('Active');
     setLastSaved('Just now');
+
+    // --- RECURSIVELY EXTRACT THE FULL TREE ---
+    const extractTree = (nodes) => {
+      return nodes.map(node => ({
+        type: node.type,
+        config: node.data,
+        trueNodes: node.trueNodes ? extractTree(node.trueNodes) : [],
+        falseNodes: node.falseNodes ? extractTree(node.falseNodes) : []
+      }));
+    };
+    
+    const workflowSteps = extractTree(flowNodes);
+
+    try {
+      const response = await fetch("http://localhost:8000/automation/start-automated", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campaign_name: "Visual Canvas Outreach",
+          leads: targetLeads, 
+          workflow: { steps: workflowSteps }
+        })
+      });
+
+      if (!response.ok) throw new Error("Failed to start workflow");
+      
+      const data = await response.json();
+
+      // === NEW: UPDATE ALL LEADS IN LOCAL STORAGE ===
+      // This makes the Leads page instantly show them as "Contacted"
+      const updatedLeads = parsedLeads.map(lead => ({
+        ...lead,
+        status: "Contacted", // Move them out of "New"
+        lastActivity: "Enrolled in AI Workflow",
+        timestamp: "Just now",
+        aiScore: lead.aiScore > 90 ? lead.aiScore : lead.aiScore + 5 // Slight bump for engagement
+      }));
+      localStorage.setItem('uploaded_leads', JSON.stringify(updatedLeads));
+      // ===============================================
+
+      alert(`🚀 Engine Started: ${data.message}\n${targetLeads.length} Leads have been marked as 'Contacted' in your dashboard.`);
+
+    } catch (error) {
+      console.error(error);
+      alert("Failed to start automation. Is your FastAPI backend running?");
+      setWorkflowStatus('Draft'); 
+    }
   };
 
   // --- RECURSIVE TREE HELPERS ---
@@ -419,10 +488,13 @@ export default function WorkflowBuilder() {
                       <select value={activeNode.data.unit} onChange={(e) => updateActiveNode('unit', e.target.value)} className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200">
                         <option value="Days">Days</option>
                         <option value="Hours">Hours</option>
+                        <option value="Minutes">Minutes</option>
+                        <option value="Seconds">Seconds</option>
                       </select>
                     </div>
                     <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Variance</label>
                     <select value={activeNode.data.variance} onChange={(e) => updateActiveNode('variance', e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200">
+                      <option value="Exact">Exact Timing (For testing)</option>
                       <option value="± 1 to 3 hours">± 1 to 3 hours</option>
                       <option value="± 15 to 45 mins">± 15 to 45 mins</option>
                     </select>
